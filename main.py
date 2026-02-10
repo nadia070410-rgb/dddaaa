@@ -1,17 +1,31 @@
-import telebot
 import os
-import time
+from flask import Flask, request
+import telebot
 
 TOKEN = os.getenv("TELEGRAM_TOKEN")
-bot = telebot.TeleBot(TOKEN)
+WEBHOOK_URL = os.getenv("WEBHOOK_URL")  # это URL твоего Render сервиса + /webhook
 
+bot = telebot.TeleBot(TOKEN)
+app = Flask(__name__)
+
+# команда /start
 @bot.message_handler(commands=['start'])
 def start(message):
     bot.send_message(message.chat.id, "Бот жив 🚀")
 
-while True:
-    try:
-        bot.polling(non_stop=True, interval=0)
-    except Exception as e:
-        print("Ошибка:", e)
-        time.sleep(10)
+# Flask endpoint для вебхука
+@app.route("/webhook", methods=["POST"])
+def webhook():
+    json_str = request.get_data().decode("utf-8")
+    update = telebot.types.Update.de_json(json_str)
+    bot.process_new_updates([update])
+    return "", 200
+
+# Настройка вебхука при старте
+@app.before_first_request
+def setup_webhook():
+    bot.remove_webhook()
+    bot.set_webhook(url=WEBHOOK_URL)
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000")))
